@@ -11,14 +11,14 @@ on:
       - '!fail/**'
       - '!dead-end/**'
       - '!trash/**'
-      - '!dependabot/**'
+      - '!dependabot/**'  # avoid running Workflow twice, because Dependabot creates a branch ("push" event) and a pull request)
     tags:
       - '**'
   pull_request:
     types: [opened, synchronize, reopened]
 
 env:
-  BUILD_PLATFORMS: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x
+  BUILD_PLATFORMS: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/riscv64,linux/s390x
   # Target image without tags, e.g.: `dersimn/github-actions-to-docker-hub-simple`
   TARGET_IMAGE: ${{ github.repository }}  # only if username + repository is all lowercase and the same as user + repo on Docker Hubs
 
@@ -69,26 +69,24 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Pushed Docker Tags:" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Tags:" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo '${{ steps.meta.outputs.tags }}' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-  automerge:
+  dependabot-auto-merge:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    if: github.actor == 'dependabot[bot]'
     permissions:
       pull-requests: write
       contents: write
     steps:
-      - name: Dependabot metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@v2
-        with:
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
       - name: Enable auto-merge for Dependabot PRs
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          # Using GITHUB_TOKEN __won't__ trigger following Workflows
+          # see: https://github.com/orgs/community/discussions/55906
+          #GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
